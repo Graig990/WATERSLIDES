@@ -10,7 +10,8 @@ import { LogoIcon } from '@/components/ui/Logo'
 import { cartSubtotal, useCartStore } from '@/store/cart'
 import { useHydrated } from '@/hooks/useHydrated'
 import { formatPrice } from '@/lib/utils'
-import { fieldErrors, shippingAddressSchema } from '@/lib/validation'
+import { checkoutSchema, fieldErrors, shippingAddressSchema } from '@/lib/validation'
+import { paymentMethods } from '@/data/payments'
 import { US_STATES, isNonContiguous } from '@/lib/us-states'
 
 const SHIPPING_METHODS = [
@@ -38,6 +39,8 @@ const EMPTY_FORM = {
   zip: '',
   shippingMethod: 'standard' as 'standard' | 'expedited',
   notes: '',
+  paymentMethod: '' as '' | 'zelle' | 'chime' | 'cashapp' | 'apple-pay' | 'crypto',
+  cryptoAsset: 'BTC' as 'BTC' | 'ETH' | 'USDT',
 }
 
 export function CheckoutForm() {
@@ -68,12 +71,31 @@ export function CheckoutForm() {
     // Validate client-side first for instant inline errors; the API runs the
     // exact same schema again, because client validation is a convenience,
     // not a security boundary.
-    const parsed = shippingAddressSchema.safeParse(form)
-    if (!parsed.success) {
-      const issues = fieldErrors(parsed.error)
+    const address = shippingAddressSchema.safeParse(form)
+    if (!address.success) {
+      const issues = fieldErrors(address.error)
       setErrors(issues)
       const firstKey = Object.keys(issues)[0]
       if (firstKey) document.getElementById(firstKey)?.focus()
+      return
+    }
+
+    const payload = {
+      customer: address.data,
+      lines: lines.map((line) => ({ slug: line.slug, quantity: line.quantity })),
+      payment: {
+        method: form.paymentMethod,
+        ...(form.paymentMethod === 'crypto' ? { cryptoAsset: form.cryptoAsset } : {}),
+      },
+    }
+
+    // Catches an unselected payment method before a round trip.
+    const whole = checkoutSchema.safeParse(payload)
+    if (!whole.success) {
+      const issues = fieldErrors(whole.error)
+      setErrors(issues)
+      setFormError('Choose how you want to pay.')
+      document.getElementsByName('paymentMethod')[0]?.focus()
       return
     }
 
@@ -82,20 +104,22 @@ export function CheckoutForm() {
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer: parsed.data,
-          lines: lines.map((line) => ({ slug: line.slug, quantity: line.quantity })),
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data: {
         ok?: boolean
         message?: string
         errors?: Record<string, string>
-        mode?: 'demo' | 'stripe'
         orderNumber?: string
         redirectUrl?: string
         subtotal?: number
+        payment?: {
+          method: string
+          label: string
+          configured: boolean
+          cryptoAsset: string | null
+        }
       } = await response.json()
 
       if (!response.ok || !data.ok || !data.redirectUrl) {
@@ -105,34 +129,29 @@ export function CheckoutForm() {
         return
       }
 
-      if (data.mode === 'demo') {
-        // Hand the confirmation page a snapshot before the cart is cleared.
-        // sessionStorage, not localStorage: it should not outlive the tab.
-        sessionStorage.setItem(
-          'ws4k-last-order',
-          JSON.stringify({
-            orderNumber: data.orderNumber,
-            email: parsed.data.email,
-            firstName: parsed.data.firstName,
-            shippingMethod: parsed.data.shippingMethod,
-            state: parsed.data.state,
-            subtotal: data.subtotal ?? cartSubtotal(lines),
-            lines: lines.map((line) => ({
-              slug: line.slug,
-              name: line.name,
-              image: line.image,
-              price: line.price,
-              quantity: line.quantity,
-            })),
-          }),
-        )
-        clear()
-        router.push(data.redirectUrl)
-        return
-      }
-
-      // Stripe: leave the cart intact until payment actually succeeds.
-      window.location.href = data.redirectUrl
+      // Hand the confirmation page a snapshot before the cart is cleared.
+      // sessionStorage, not localStorage: it should not outlive the tab.
+      sessionStorage.setItem(
+        'ws4k-last-order',
+        JSON.stringify({
+          orderNumber: data.orderNumber,
+          email: address.data.email,
+          firstName: address.data.firstName,
+          shippingMethod: address.data.shippingMethod,
+          state: address.data.state,
+          subtotal: data.subtotal ?? cartSubtotal(lines),
+          payment: data.payment ?? null,
+          lines: lines.map((line) => ({
+            slug: line.slug,
+            name: line.name,
+            image: line.image,
+            price: line.price,
+            quantity: line.quantity,
+          })),
+        }),
+      )
+      clear()
+      router.push(data.redirectUrl)
     } catch {
       setFormError('Network error. Please check your connection and try again.')
       setSubmitting(false)
@@ -328,14 +347,89 @@ export function CheckoutForm() {
         </fieldset>
 
         <fieldset className="rounded-3xl border-2 border-sky-tint bg-white p-5">
-          <legend className="px-2 text-lg font-bold text-deep-blue">4. Payment</legend>
-          <p className="flex items-start gap-2 text-sm text-ink/75">
+          <legend className="px-2 text-lg font-bold text-deep-blue">4. How you want to pay</legend>
+
+          <p className="mb-4 flex items-start gap-2 rounded-2xl bg-sky-tint/60 p-3 text-sm text-ink/80">
             <Lock aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" />
             <span>
-              Card details are entered on Stripe&rsquo;s secure checkout, never on this site. We
-              never see or store your card number.
+              <strong>Nothing is charged now.</strong> Place your order and we send payment
+              instructions for the method you pick. We ship once your payment clears. We never
+              handle or store card numbers.
             </span>
           </p>
+
+          <div className="space-y-3">
+            {paymentMethods.map((method) => {
+              const selected = form.paymentMethod === method.id
+              return (
+                <label
+                  key={method.id}
+                  className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 ${
+                    selected ? 'border-deep-blue bg-sky-tint/50' : 'border-sky-tint hover:border-splash-blue'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value={method.id}
+                    checked={selected}
+                    onChange={() => update('paymentMethod', method.id)}
+                    className="mt-1 h-5 w-5 accent-[#0057B8]"
+                  />
+                  <span className="flex-1">
+                    <span className="flex items-center gap-2 font-bold">
+                      <span aria-hidden="true">{method.glyph}</span>
+                      {method.label}
+                    </span>
+                    <span className="block text-sm text-ink/70">{method.blurb}</span>
+                    <span className="mt-1 block text-xs text-ink/55">
+                      Clears: {method.clearingTime}
+                    </span>
+
+                    {method.id === 'crypto' && selected ? (
+                      <span className="mt-3 block">
+                        <span className="mb-1.5 block text-sm font-bold">Which coin?</span>
+                        <span className="flex flex-wrap gap-2">
+                          {(['BTC', 'ETH', 'USDT'] as const).map((symbol) => (
+                            <button
+                              key={symbol}
+                              type="button"
+                              onClick={() => update('cryptoAsset', symbol)}
+                              aria-pressed={form.cryptoAsset === symbol}
+                              className={`min-h-[44px] rounded-xl border-2 px-4 text-sm font-bold ${
+                                form.cryptoAsset === symbol
+                                  ? 'border-grape bg-grape text-white'
+                                  : 'border-sky-tint bg-white text-deep-blue hover:border-grape'
+                              }`}
+                            >
+                              {symbol}
+                            </button>
+                          ))}
+                        </span>
+                        <span className="mt-2 flex items-start gap-2 rounded-xl bg-hot-coral/12 p-2.5 text-xs text-ink/80">
+                          <AlertTriangle
+                            aria-hidden="true"
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-hot-coral"
+                          />
+                          <span>
+                            Crypto payments cannot be reversed. Check the network on the next
+                            screen before sending — funds sent on the wrong network are
+                            unrecoverable.
+                          </span>
+                        </span>
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+
+          {errors['payment.method'] ? (
+            <p role="alert" className="mt-3 text-sm font-semibold text-hot-coral">
+              {errors['payment.method']}
+            </p>
+          ) : null}
         </fieldset>
       </div>
 
@@ -380,7 +474,7 @@ export function CheckoutForm() {
             <dd>Calculated at payment</dd>
           </div>
           <div className="flex justify-between border-t-2 border-white pt-3 text-lg">
-            <dt className="font-extrabold">Total</dt>
+            <dt className="font-extrabold">Amount to pay</dt>
             <dd className="font-extrabold">{formatPrice(subtotal)}</dd>
           </div>
         </dl>
@@ -396,7 +490,7 @@ export function CheckoutForm() {
           disabled={submitting}
           className="mt-5 inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-sunny-yellow px-6 text-lg font-extrabold text-ink shadow-pop transition hover:brightness-105 disabled:opacity-60"
         >
-          {submitting ? 'Starting checkout…' : `Place order · ${formatPrice(subtotal)}`}
+          {submitting ? 'Placing order…' : `Place order · ${formatPrice(subtotal)}`}
         </button>
 
         <p className="mt-3 text-center text-xs text-ink/60">

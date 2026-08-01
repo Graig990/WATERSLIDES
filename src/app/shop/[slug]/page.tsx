@@ -7,6 +7,7 @@ import { CompareTable } from '@/components/product/CompareTable'
 import { NotifyMeForm } from '@/components/product/NotifyMeForm'
 import { ProductCard } from '@/components/product/ProductCard'
 import { ProductGallery } from '@/components/product/ProductGallery'
+import { ProductReviews } from '@/components/product/ProductReviews'
 import { StickyAddToCart } from '@/components/product/StickyAddToCart'
 import { PdpBuyBox } from '@/components/product/PdpBuyBox'
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
@@ -283,6 +284,8 @@ export default async function ProductPage(props: { params: Promise<{ slug: strin
           <FaqAccordion faqs={product.faqs} />
         </div>
       </section>
+
+      <ProductReviews productSlug={product.slug} productName={product.shortName} />
 
       {/* Comparison */}
       {related.length > 0 ? (

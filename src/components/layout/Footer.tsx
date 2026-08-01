@@ -3,10 +3,13 @@ import { Mail, Phone } from 'lucide-react'
 import { LogoStacked } from '@/components/ui/Logo'
 import { FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/ui/SocialIcons'
 import { siteConfig } from '@/data/site'
+import { paymentBadges } from '@/data/payments'
 import { footerNav } from './navigation'
 import { NewsletterForm } from './NewsletterForm'
 
-const PAYMENT_METHODS = ['Visa', 'Mastercard', 'Amex', 'Discover', 'Apple Pay', 'Google Pay']
+// Rendered as text rather than brand logos — those marks are trademarked
+// and not ours to redistribute.
+const PAYMENT_METHODS = paymentBadges()
 
 const SOCIAL_LINKS = [
   { href: siteConfig.socials.facebook, label: 'Facebook', Icon: FacebookIcon },

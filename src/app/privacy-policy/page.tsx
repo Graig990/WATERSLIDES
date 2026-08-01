@@ -59,8 +59,10 @@ export default function PrivacyPolicyPage() {
         <h2>What we deliberately do not do</h2>
         <ul className="droplet-list">
           <li>
-            <strong>We do not see or store card numbers.</strong> Payment is handled entirely by
-            Stripe on their own checkout. Card details never touch this site&rsquo;s servers.
+            <strong>We do not see or store card numbers.</strong> We do not accept cards at all.
+            Payment happens outside this website — through your own banking or payment app, or a
+            crypto wallet you control — so no payment credentials are ever entered here or stored
+            on our servers.
           </li>
           <li>
             <strong>We do not write your email address or message contents into server logs.</strong>{' '}
@@ -87,7 +89,12 @@ export default function PrivacyPolicyPage() {
 
         <h2>Who we share data with</h2>
         <ul className="droplet-list">
-          <li><strong>Stripe</strong> — payment processing.</li>
+          <li>
+            <strong>Your chosen payment provider</strong> — Zelle, Chime, Cash App, Apple Pay or a
+            blockchain network. You interact with these directly; we only see that a payment
+            arrived. Each has its own privacy policy and, for crypto, transactions are recorded on
+            a public ledger.
+          </li>
           <li><strong>Shipping carriers</strong> — your name, address and phone, to deliver the order.</li>
           <li><strong>Google Analytics</strong> — usage data, only if enabled on this deployment.</li>
         </ul>

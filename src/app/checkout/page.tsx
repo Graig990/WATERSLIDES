@@ -15,7 +15,8 @@ export default function CheckoutPage() {
       <div className="mx-auto max-w-7xl px-4">
         <h1 className="mb-2 text-4xl">Checkout</h1>
         <p className="mb-8 text-ink/70">
-          Free shipping is already applied. Card details are handled by Stripe, never by us.
+          Free shipping is already applied. Nothing is charged here — place your order and we send
+          payment instructions for the method you choose. We never handle card numbers.
         </p>
         <CheckoutForm />
       </div>

@@ -55,14 +55,40 @@ export const checkoutLineSchema = z.object({
   quantity: z.number().int().min(1).max(10),
 })
 
+export const paymentSelectionSchema = z.object({
+  method: z.enum(['zelle', 'chime', 'cashapp', 'apple-pay', 'crypto'], {
+    message: 'Choose how you want to pay',
+  }),
+  /** Only meaningful when method is 'crypto'. */
+  cryptoAsset: z.enum(['BTC', 'ETH', 'USDT']).optional(),
+})
+
 export const checkoutSchema = z.object({
   lines: z.array(checkoutLineSchema).min(1, 'Your cart is empty'),
   customer: shippingAddressSchema,
+  payment: paymentSelectionSchema,
+})
+
+export const reviewSchema = z.object({
+  productSlug: z.string().trim().min(1),
+  authorName: z.string().trim().min(2, 'Please tell us your name').max(80),
+  email,
+  rating: z.coerce.number().int().min(1, 'Choose a rating').max(5),
+  title: z.string().trim().min(3, 'Give your review a short headline').max(120),
+  body: z
+    .string()
+    .trim()
+    .min(20, 'A little more detail helps other buyers')
+    .max(3000, 'Review is too long'),
+  orderNumber: z.string().trim().max(40).optional().or(z.literal('')),
+  /** Honeypot. */
+  website: z.string().max(0).optional().or(z.literal('')),
 })
 
 export type ShippingAddress = z.infer<typeof shippingAddressSchema>
 export type CheckoutPayload = z.infer<typeof checkoutSchema>
 export type ContactPayload = z.infer<typeof contactSchema>
+export type ReviewPayload = z.infer<typeof reviewSchema>
 
 /** Flatten a ZodError into `{ fieldName: firstMessage }` for inline errors. */
 export function fieldErrors(error: z.ZodError): Record<string, string> {

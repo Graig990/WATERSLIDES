@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. No env vars are required — with no Stripe keys configured the checkout runs in demo mode and the full cart → checkout → confirmation flow still completes.
+Open http://localhost:3000. No env vars are required — the full cart → checkout → confirmation flow works out of the box.
 
 ### Scripts
 
@@ -44,20 +44,39 @@ Copy `.env.example` to `.env.local`. Every value is optional.
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Canonical origin. Drives canonical tags, OG URLs and `sitemap.xml`. Defaults to `https://waterslides4kids.com`. |
-| `STRIPE_SECRET_KEY` | Enables real Stripe Checkout. **Leave blank for demo mode.** |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key. |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Renders the Search Console `<meta>` tag when set. |
 | `NEXT_PUBLIC_BING_SITE_VERIFICATION` | Renders the Bing Webmaster `<meta>` tag when set. |
 | `NEXT_PUBLIC_GA4_MEASUREMENT_ID` | Loads GA4 (deferred). No analytics script loads at all when unset. |
 
-### Demo vs. Stripe checkout
+There are no payment env vars — see below.
 
-`/api/checkout` looks for `STRIPE_SECRET_KEY`:
+## Payments — manual settlement
 
-- **Absent** → returns a generated order number and redirects to `/order-confirmation?order=…&demo=1`. The checkout page writes an order snapshot to `sessionStorage` and clears the cart. Nothing is charged.
-- **Present** → creates a real Stripe Checkout Session and redirects to Stripe. The cart is deliberately *not* cleared until the customer returns to `/order-confirmation?session_id=…`, so an abandoned payment does not lose their basket.
+The store accepts **Zelle, Chime, Cash App, Apple Pay and crypto (BTC, ETH, USDT)**. There is no card gateway, which shapes the whole flow:
 
-Either way, **prices are resolved server-side from `products.ts` by slug.** The client only ever posts slugs and quantities — a price posted from the browser is never trusted.
+1. Customer picks a payment method at checkout.
+2. `/api/checkout` validates, resolves prices, and issues an order number. **Nothing is charged.**
+3. The confirmation page shows payment instructions for that method — account handle or wallet address, the exact amount, and the order number to use as a reference.
+4. You confirm the funds have cleared, then ship.
+
+Orders are therefore *awaiting payment*, never *paid*, and the UI says so.
+
+**Prices are resolved server-side from `products.ts` by slug.** The client only ever posts slugs and quantities — a price posted from the browser is never trusted.
+
+### Configuring payment accounts
+
+Everything lives in [`src/data/payments.ts`](src/data/payments.ts) — handles in `paymentMethods`, wallet addresses in `cryptoAssets`. They are in version control rather than env vars deliberately, because a wrong wallet address is a money-loss bug and it should be reviewable in a diff.
+
+**Every field ships empty.** The UI checks `isMethodConfigured()` and, for anything unfilled, tells the customer you will email the details instead of displaying an account. No placeholder handle or example wallet address appears anywhere in this codebase — crypto sent to a wrong address is unrecoverable, so there is nothing here that could be mistaken for a real one.
+
+Before launch: fill each field in, then **send yourself a small test payment on every method you enable.** Copy crypto addresses from your wallet; never retype them.
+
+### Things to know about these rails
+
+- **No chargeback or buyer/seller protection** on any of them. Confirm funds have actually cleared before shipping — Zelle and Cash App payments can still be reversed by a sending bank in fraud cases, and crypto cannot be reversed at all.
+- **Zelle, Chime and Cash App are peer-to-peer consumer services.** Their terms generally restrict business use, and running commercial volume through a personal account risks it being frozen. Use a business account where the provider offers one and check their current terms.
+- **Network matters for crypto.** `cryptoAssets` carries a `network` field that is displayed alongside every address, because funds sent on the wrong network are lost. USDT in particular exists on several chains.
+- **Tax and reporting** are your responsibility on all of these; none of them withhold or report the way a card processor does.
 
 ---
 
@@ -66,7 +85,7 @@ Either way, **prices are resolved server-side from `products.ts` by slug.** The 
 ```
 src/
   app/                   Routes (App Router)
-    api/                 checkout, contact, newsletter, notify
+    api/                 checkout, contact, newsletter, notify, reviews
     collections/[slug]/  All 8 collections (topic + height)
     shop/[slug]/         26 product pages
     blog/[slug]/         10 guides, bodies pulled from src/content
@@ -74,7 +93,7 @@ src/
   components/
     blog/ cart/ checkout/ home/ layout/ product/ shop/ ui/
   content/blog/          MDX article bodies
-  data/                  site.ts, products.ts, collections.ts, blog.ts, reviews.ts
+  data/                  site.ts, products.ts, collections.ts, blog.ts, reviews.ts, payments.ts
   hooks/ lib/ store/
 public/brand/            Logo lockups, favicons, PWA icons, OG card
 scripts/audit.mjs        Link + SEO crawler
@@ -124,11 +143,15 @@ Set `homepageFeatured: true` to put it in the homepage grid — the grid is mean
 
 The post gets `Article` + `FAQPage` JSON-LD, an author block, a featured image taken from `featureProductSlug`, and a sitemap entry.
 
-## Adding real reviews
+## Reviews
 
-`src/data/reviews.ts` ships **empty on purpose** — see the comment at the top of the file. Add real entries and the homepage reviews section, the PDP review block and `AggregateRating` schema all switch on automatically. `AggregateRating` only emits for products with at least `MIN_REVIEWS_FOR_SCHEMA` (3) genuine reviews.
+Customers submit reviews from the block on any product page. Submissions POST to `/api/reviews`, which validates them and routes them **to moderation rather than straight to the page** — publishing unmoderated text on a childrens product site invites abuse, and the FTC rules on consumer reviews mean you need to be able to stand behind what appears on your own product pages.
 
-Do not seed it with samples, even temporarily.
+To publish one: verify the reviewer actually bought the product, then add an entry to `src/data/reviews.ts`. The PDP review block, the homepage reviews section and `AggregateRating` schema all switch on automatically. A star average and `AggregateRating` only appear once a product has at least `MIN_REVIEWS_FOR_SCHEMA` (3) real reviews — below that an average is noise.
+
+`reviews.ts` ships **empty on purpose**. Do not seed it with samples, even temporarily: fabricated reviews are an FTC problem before they are an SEO one, and fake `AggregateRating` markup is a well-known trigger for a manual action that strips rich results across the whole domain.
+
+TODO in `/api/reviews`: wire the moderation destination (database, helpdesk, or an email to yourself).
 
 ---
 
@@ -172,15 +195,20 @@ Confirm all of them with your supplier before launch. Publishing a wrong weight 
 
 `mpn` values are read off the public product-image filenames and also need confirming.
 
-### 4. The legal pages are templates
+### 4. Payment accounts are empty
+
+Every handle and wallet address in `src/data/payments.ts` is blank. Until they are filled in, checkout completes and tells customers you will email payment details. Fill them in and send yourself a test payment on each enabled method before trading.
+
+### 5. The legal pages are templates
 
 `/privacy-policy` and `/terms` describe how the site actually behaves, but they have not been reviewed by an attorney and both carry a visible banner saying so. Because you are selling children's recreational equipment, the liability, safe-use and indemnity sections deserve professional review. The governing-law clause needs your actual state.
 
 ### Also outstanding
 
-- `/api/newsletter`, `/api/notify` and `/api/contact` validate and accept but do not yet deliver anywhere — wire up your email platform. They deliberately do not log email addresses or message contents.
+- `/api/newsletter`, `/api/notify`, `/api/contact` and `/api/reviews` validate and accept but do not yet deliver anywhere — wire up your email platform. They deliberately do not log email addresses or message contents.
 - `/financing` describes options honestly but no financing provider is integrated.
 - No per-product setup videos yet; the PDP links to the homepage video as a stand-in.
+- Orders are not persisted anywhere. The confirmation page reads a `sessionStorage` snapshot, so a customer who closes the tab loses their payment instructions. Wiring up order storage and a confirmation email is the first thing to do for real trading.
 
 ---
 

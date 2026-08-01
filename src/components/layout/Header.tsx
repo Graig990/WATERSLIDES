@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronDown, Menu, Search, ShoppingCart, X } from 'lucide-react'
+import { ChevronDown, Home, Menu, Search, ShoppingCart, X } from 'lucide-react'
 import { HeaderLogo, LogoStacked } from '@/components/ui/Logo'
 import { useCartStore, cartItemCount } from '@/store/cart'
 import { useHydrated } from '@/hooks/useHydrated'
 import { cn } from '@/lib/utils'
-import { megaMenuHeights, megaMenuTopics, primaryNav } from './navigation'
+import { isNavItemActive, megaMenuHeights, megaMenuTopics, primaryNav } from './navigation'
 
 export function Header() {
   const pathname = usePathname()
@@ -70,7 +70,7 @@ export function Header() {
     }
   }, [])
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
+  const isActive = (href: string) => isNavItemActive(pathname, href)
 
   return (
     <header className="sticky top-0 z-50 border-b-2 border-sky-tint bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
@@ -80,7 +80,20 @@ export function Header() {
         {/* Desktop navigation */}
         <nav aria-label="Main" className="ml-auto hidden items-center gap-1 lg:flex">
           <Link
+            href="/"
+            aria-current={isActive('/') ? 'page' : undefined}
+            className={cn(
+              'flex items-center gap-1.5 rounded-xl px-3 py-2 font-bold text-deep-blue hover:bg-sky-tint',
+              isActive('/') && 'bg-sky-tint',
+            )}
+          >
+            <Home aria-hidden="true" className="h-4 w-4" />
+            Home
+          </Link>
+
+          <Link
             href="/shop"
+            aria-current={isActive('/shop') ? 'page' : undefined}
             className={cn(
               'rounded-xl px-3 py-2 font-bold text-deep-blue hover:bg-sky-tint',
               isActive('/shop') && 'bg-sky-tint',
@@ -157,7 +170,7 @@ export function Header() {
           </div>
 
           {primaryNav
-            .filter((item) => item.href !== '/shop')
+            .filter((item) => item.href !== '/shop' && item.href !== '/')
             .map((item) => (
               <Link
                 key={item.href}

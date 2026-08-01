@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { checkoutSchema, fieldErrors } from '@/lib/validation'
 import { getProduct } from '@/data/products'
-import { absoluteUrl, siteConfig } from '@/data/site'
+import { getPaymentMethod, isMethodConfigured } from '@/data/payments'
 
 export const runtime = 'nodejs'
 
@@ -13,7 +13,7 @@ interface ResolvedLine {
   image: string
 }
 
-/** Order numbers are display-only; they carry no customer data. */
+/** Order numbers are display-only; they encode no customer data. */
 function generateOrderNumber(): string {
   const stamp = Date.now().toString(36).toUpperCase().slice(-6)
   const random = Math.random().toString(36).toUpperCase().slice(2, 6)
@@ -31,12 +31,16 @@ export async function POST(request: Request) {
   const parsed = checkoutSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { ok: false, message: 'Please check the highlighted fields.', errors: fieldErrors(parsed.error) },
+      {
+        ok: false,
+        message: 'Please check the highlighted fields.',
+        errors: fieldErrors(parsed.error),
+      },
       { status: 400 },
     )
   }
 
-  const { lines, customer } = parsed.data
+  const { lines, payment } = parsed.data
 
   /*
    * Prices are looked up from the catalog on the server. The client sends
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
     const product = getProduct(line.slug)
     if (!product) {
       return NextResponse.json(
-        { ok: false, message: `We no longer carry one of the items in your cart.` },
+        { ok: false, message: 'We no longer carry one of the items in your cart.' },
         { status: 400 },
       )
     }
@@ -67,71 +71,49 @@ export async function POST(request: Request) {
     })
   }
 
-  const subtotal = resolved.reduce((total, line) => total + line.unitPrice * line.quantity, 0)
-  const orderNumber = generateOrderNumber()
-  const stripeKey = process.env.STRIPE_SECRET_KEY
-
-  // ---- Demo mode -------------------------------------------------------
-  // No Stripe keys configured: complete the flow end-to-end without taking
-  // a payment, so the cart → checkout → confirmation path is never broken.
-  if (!stripeKey) {
-    return NextResponse.json({
-      ok: true,
-      mode: 'demo' as const,
-      orderNumber,
-      subtotal,
-      lines: resolved,
-      redirectUrl: `/order-confirmation?order=${encodeURIComponent(orderNumber)}&demo=1`,
-    })
-  }
-
-  // ---- Stripe Checkout -------------------------------------------------
-  try {
-    const { default: Stripe } = await import('stripe')
-    const stripe = new Stripe(stripeKey)
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      // Never log or persist the address here — Stripe is the system of record.
-      customer_email: customer.email,
-      client_reference_id: orderNumber,
-      line_items: resolved.map((line) => ({
-        quantity: line.quantity,
-        price_data: {
-          currency: 'usd',
-          unit_amount: line.unitPrice * 100,
-          product_data: {
-            name: line.name,
-            images: [line.image],
-          },
-        },
-      })),
-      shipping_address_collection: { allowed_countries: ['US'] },
-      automatic_tax: { enabled: false },
-      metadata: { orderNumber, source: siteConfig.name },
-      success_url: `${absoluteUrl('/order-confirmation')}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: absoluteUrl('/checkout?canceled=1'),
-    })
-
-    if (!session.url) {
-      return NextResponse.json(
-        { ok: false, message: 'Stripe did not return a checkout URL. Please try again.' },
-        { status: 502 },
-      )
-    }
-
-    return NextResponse.json({
-      ok: true,
-      mode: 'stripe' as const,
-      orderNumber,
-      redirectUrl: session.url,
-    })
-  } catch (error) {
-    // Log the failure reason, never the customer payload.
-    console.error('[checkout] Stripe session creation failed:', (error as Error).message)
+  const method = getPaymentMethod(payment.method)
+  if (!method) {
     return NextResponse.json(
-      { ok: false, message: 'We could not start the payment session. Please try again.' },
-      { status: 502 },
+      { ok: false, message: 'That payment method is not available.', errors: { 'payment.method': 'Choose how you want to pay' } },
+      { status: 400 },
     )
   }
+
+  const subtotal = resolved.reduce((total, line) => total + line.unitPrice * line.quantity, 0)
+  const orderNumber = generateOrderNumber()
+
+  /*
+   * Every method here settles manually — no card gateway is involved, so
+   * nothing is charged at this point. The order is recorded as awaiting
+   * payment and the customer is handed instructions.
+   *
+   * TODO: persist the order (database or order-management system) and send
+   * the confirmation email. Until that exists the confirmation page relies on
+   * a sessionStorage snapshot written by the browser, which means a customer
+   * who closes the tab loses their instructions — they can still reach you by
+   * phone, but this is the first thing to wire up for real trading.
+   *
+   * TODO: notify yourself of the new order so you can watch for the payment.
+   */
+
+  return NextResponse.json({
+    ok: true,
+    mode: 'manual' as const,
+    orderNumber,
+    subtotal,
+    lines: resolved,
+    payment: {
+      method: method.id,
+      label: method.label,
+      /*
+       * Whether we can show real payment details. When the method has not
+       * been configured the confirmation page promises follow-up by email
+       * rather than displaying anything that looks like an account —
+       * a wrong crypto address in particular loses the customer's money.
+       */
+      configured: isMethodConfigured(method),
+      cryptoAsset: payment.cryptoAsset ?? null,
+    },
+    redirectUrl: `/order-confirmation?order=${encodeURIComponent(orderNumber)}`,
+  })
 }

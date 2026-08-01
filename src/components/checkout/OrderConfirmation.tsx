@@ -1,14 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { CheckCircle2, Mail, PackageCheck, Truck } from 'lucide-react'
 import { ButtonLink } from '@/components/ui/Button'
-import { useCartStore } from '@/store/cart'
 import { useHydrated } from '@/hooks/useHydrated'
 import { formatPrice } from '@/lib/utils'
 import { siteConfig } from '@/data/site'
+import { PaymentInstructions, type OrderPayment } from './PaymentInstructions'
 
 interface OrderSnapshot {
   orderNumber: string
@@ -17,13 +16,13 @@ interface OrderSnapshot {
   shippingMethod: string
   state: string
   subtotal: number
+  payment: OrderPayment | null
   lines: { slug: string; name: string; image: string; price: number; quantity: number }[]
 }
 
 interface ConfirmationData {
   order: OrderSnapshot | null
   orderNumber: string
-  fromStripe: boolean
 }
 
 /*
@@ -38,8 +37,6 @@ function readConfirmation(): ConfirmationData {
   if (cached) return cached
 
   const params = new URLSearchParams(window.location.search)
-  const sessionId = params.get('session_id')
-  const demoOrder = params.get('order')
 
   let order: OrderSnapshot | null = null
   const stored = sessionStorage.getItem('ws4k-last-order')
@@ -51,25 +48,19 @@ function readConfirmation(): ConfirmationData {
     }
   }
 
-  const orderNumber = sessionId
-    ? sessionId.slice(-12).toUpperCase()
-    : (demoOrder ?? order?.orderNumber ?? '')
-
-  cached = { order, orderNumber, fromStripe: Boolean(sessionId) }
+  cached = {
+    order,
+    orderNumber: params.get('order') ?? order?.orderNumber ?? '',
+  }
   return cached
 }
 
 export function OrderConfirmation() {
   const hydrated = useHydrated()
-  const clear = useCartStore((state) => state.clear)
 
+  // The checkout clears the cart itself once the order is accepted, so there
+  // is nothing to reconcile here.
   const data = hydrated ? readConfirmation() : null
-
-  // Emptying the cart is an update to an external store, which is what
-  // effects are for. Returning from Stripe means the payment succeeded.
-  useEffect(() => {
-    if (data?.fromStripe) clear()
-  }, [data?.fromStripe, clear])
 
   if (!data) {
     return <p className="py-16 text-center text-ink/60">Confirming your order…</p>
@@ -104,7 +95,7 @@ export function OrderConfirmation() {
       <div className="rounded-3xl border-2 border-lime-pop/40 bg-lime-pop/10 p-8 text-center">
         <CheckCircle2 aria-hidden="true" className="mx-auto mb-4 h-16 w-16 text-lime-ink" />
         <h1 className="text-3xl sm:text-4xl">
-          {order?.firstName ? `Thanks, ${order.firstName}!` : 'Thanks — your order is in!'}
+          {order?.firstName ? `Thanks, ${order.firstName}!` : 'Order placed!'}
         </h1>
         <p className="mt-3 text-lg text-ink/80">
           Order number{' '}
@@ -114,6 +105,14 @@ export function OrderConfirmation() {
           <p className="mt-2 text-ink/70">A confirmation is on its way to {order.email}.</p>
         ) : null}
       </div>
+
+      {order?.payment ? (
+        <PaymentInstructions
+          payment={order.payment}
+          orderNumber={orderNumber || order.orderNumber}
+          amount={order.subtotal}
+        />
+      ) : null}
 
       {order && order.lines.length > 0 ? (
         <div className="mt-8 rounded-3xl border-2 border-sky-tint bg-white p-6">
@@ -169,8 +168,8 @@ export function OrderConfirmation() {
           <li className="flex gap-3">
             <Mail aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-splash-blue-ink" />
             <span>
-              <strong className="block">Confirmation email</strong>
-              Arrives within a few minutes with your order number and a summary.
+              <strong className="block">Send your payment</strong>
+              Use the instructions above and quote your order number. Nothing has been charged — we only ship once payment clears.
             </span>
           </li>
           <li className="flex gap-3">
@@ -179,7 +178,7 @@ export function OrderConfirmation() {
               className="mt-0.5 h-5 w-5 shrink-0 text-splash-blue-ink"
             />
             <span>
-              <strong className="block">We pick and pack — 1 to 3 business days</strong>
+              <strong className="block">We confirm and pack — 1 to 3 business days after payment</strong>
               Your blower, stakes, storage bag and patch kit ship in the same carton.
             </span>
           </li>

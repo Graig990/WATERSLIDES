@@ -12,11 +12,20 @@ export const megaMenuHeights = heightCollections.map((collection) => ({
 }))
 
 export const primaryNav = [
+  { href: '/', label: 'Home' },
   { href: '/shop', label: 'Shop' },
   { href: '/blog', label: 'Blog' },
   { href: '/about', label: 'About' },
   { href: '/contact', label: 'Contact' },
 ]
+
+/**
+ * '/' is a prefix of every route, so it only counts as active on an exact
+ * match — otherwise Home highlights on every page of the site.
+ */
+export function isNavItemActive(pathname: string, href: string): boolean {
+  return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
+}
 
 export const footerNav = {
   shop: [
@@ -33,6 +42,7 @@ export const footerNav = {
     { href: '/financing', label: 'Financing' },
   ],
   company: [
+    { href: '/', label: 'Home' },
     { href: '/about', label: 'About Us' },
     { href: '/blog', label: 'Blog' },
     { href: '/privacy-policy', label: 'Privacy Policy' },

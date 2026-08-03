@@ -7,6 +7,8 @@ import { ChevronDown, Home, Menu, Search, ShoppingCart, X } from 'lucide-react'
 import { HeaderLogo, LogoStacked } from '@/components/ui/Logo'
 import { useCartStore, cartItemCount } from '@/store/cart'
 import { useHydrated } from '@/hooks/useHydrated'
+import { useScrollLock } from '@/hooks/useScrollLock'
+import { Portal } from '@/components/ui/Portal'
 import { cn } from '@/lib/utils'
 import { isNavItemActive, megaMenuHeights, megaMenuTopics, primaryNav } from './navigation'
 
@@ -37,13 +39,8 @@ export function Header() {
     setSearchOpen(false)
   }
 
-  // The mobile panel is a full-screen overlay — stop the page behind it scrolling.
-  useEffect(() => {
-    document.body.style.overflow = mobileOpen ? 'hidden' : ''
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [mobileOpen])
+  // The mobile panel covers the viewport — stop the page behind it scrolling.
+  useScrollLock(mobileOpen)
 
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus()
@@ -261,10 +258,24 @@ export function Header() {
         </div>
       ) : null}
 
-      {/* Mobile panel */}
+      {/*
+        Mobile panel — portalled to <body>.
+
+        It must not render inside <header>: the header's backdrop-blur makes
+        it a containing block for fixed-position descendants, so `fixed
+        inset-0` would resolve against the 72px header box instead of the
+        viewport and the menu would collapse into an invisible strip while
+        the scroll lock still froze the page.
+      */}
       {mobileOpen ? (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white lg:hidden">
-          <div className="flex h-[72px] shrink-0 items-center justify-between border-b-2 border-sky-tint px-4">
+        <Portal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Site menu"
+            className="fixed inset-0 z-[70] flex flex-col overscroll-contain bg-white lg:hidden"
+          >
+            <div className="flex h-[72px] shrink-0 items-center justify-between border-b-2 border-sky-tint px-4">
             <span className="font-extrabold text-deep-blue">Menu</span>
             <button
               type="button"
@@ -325,8 +336,9 @@ export function Header() {
                 </li>
               ))}
             </ul>
-          </nav>
-        </div>
+            </nav>
+          </div>
+        </Portal>
       ) : null}
     </header>
   )

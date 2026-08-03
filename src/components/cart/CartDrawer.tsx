@@ -9,6 +9,7 @@ import { ButtonLink } from '@/components/ui/Button'
 import { LogoIcon } from '@/components/ui/Logo'
 import { cartSubtotal, useCartStore } from '@/store/cart'
 import { useHydrated } from '@/hooks/useHydrated'
+import { useScrollLock } from '@/hooks/useScrollLock'
 import { formatPrice } from '@/lib/utils'
 import { QtyStepper } from './QtyStepper'
 
@@ -31,12 +32,12 @@ export function CartDrawer() {
       if (event.key === 'Escape') closeDrawer()
     }
     document.addEventListener('keydown', onKeyDown)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = ''
-    }
+    return () => document.removeEventListener('keydown', onKeyDown)
   }, [isOpen, closeDrawer])
+
+  // Shared with the mobile menu. `overflow: hidden` alone does not hold on
+  // iOS Safari, which scrolls the page behind the drawer regardless.
+  useScrollLock(isOpen)
 
   if (!hydrated || !isOpen) return null
 

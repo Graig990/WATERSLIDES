@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { AlertTriangle, Check, Copy, Mail } from 'lucide-react'
 import { configuredCryptoAssets, getPaymentMethod } from '@/data/payments'
+import { CryptoAssetLogo, PaymentMethodLogo } from '@/components/ui/PaymentMethodLogo'
 import { siteConfig } from '@/data/site'
 import { formatPrice } from '@/lib/utils'
 
@@ -87,9 +88,13 @@ export function PaymentInstructions({
 
   return (
     <section className="mt-8 rounded-3xl border-2 border-sunny-yellow bg-sunny-yellow/10 p-6">
-      <h2 className="flex items-center gap-2 text-xl">
-        <span aria-hidden="true">{method.glyph}</span>
-        Pay by {method.label} to complete your order
+      <h2 className="flex flex-wrap items-center gap-2 text-xl">
+        {isCrypto && asset ? (
+          <CryptoAssetLogo symbol={asset.symbol} className="h-7 w-7" />
+        ) : (
+          <PaymentMethodLogo method={method} className="h-7" />
+        )}
+        Pay by {isCrypto && asset ? asset.name : method.label} to complete your order
       </h2>
 
       <p className="mt-2 text-ink/80">

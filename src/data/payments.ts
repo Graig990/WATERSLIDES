@@ -55,8 +55,15 @@ export interface PaymentMethod {
   label: string
   /** Shown on the checkout radio. */
   blurb: string
-  /** Emoji marker — these brands' logos are trademarked and not ours to ship. */
-  glyph: string
+  /**
+   * Official logo filename inside public/brand/payments/, e.g. 'zelle.svg'.
+   * Empty until you download the real artwork — see the README in that
+   * folder. While empty, a brand-coloured wordmark chip renders instead of
+   * an approximation of someone else's trademark.
+   */
+  logoFile: string
+  /** The brand's own colour, used for the placeholder chip. */
+  brandColor: string
   /** The account identifier the customer sends to. Empty = not configured. */
   handle: string
   /** Displayed above the payment details on the confirmation page. */
@@ -70,7 +77,8 @@ export const paymentMethods: PaymentMethod[] = [
     id: 'zelle',
     label: 'Zelle',
     blurb: 'Bank-to-bank transfer. Usually clears in minutes.',
-    glyph: '⚡',
+    logoFile: '', // TODO: zelle.svg
+    brandColor: '#6D1ED4',
     handle: '', // TODO: the email or US mobile number registered with Zelle
     clearingTime: 'Usually minutes, occasionally up to 1 business day',
     instructions: [
@@ -83,7 +91,8 @@ export const paymentMethods: PaymentMethod[] = [
     id: 'chime',
     label: 'Chime',
     blurb: 'Pay by Chime transfer using your $ChimeSign.',
-    glyph: '💚',
+    logoFile: '', // TODO: chime.svg
+    brandColor: '#1EC677',
     handle: '', // TODO: your $ChimeSign, including the leading $
     clearingTime: 'Usually instant between Chime accounts',
     instructions: [
@@ -96,7 +105,8 @@ export const paymentMethods: PaymentMethod[] = [
     id: 'cashapp',
     label: 'Cash App',
     blurb: 'Pay with your $Cashtag.',
-    glyph: '💵',
+    logoFile: '', // TODO: cashapp.svg
+    brandColor: '#00D64F',
     handle: '', // TODO: your $Cashtag, including the leading $
     clearingTime: 'Usually instant',
     instructions: [
@@ -109,7 +119,8 @@ export const paymentMethods: PaymentMethod[] = [
     id: 'apple-pay',
     label: 'Apple Pay',
     blurb: 'Pay from Apple Wallet on iPhone, iPad or Mac.',
-    glyph: '',
+    logoFile: '', // TODO: applepay.svg — read the Apple Pay warning in the README first
+    brandColor: '#000000',
     handle: '', // TODO: the Apple Cash phone number/email, or leave empty
     clearingTime: 'Usually instant',
     instructions: [
@@ -122,7 +133,8 @@ export const paymentMethods: PaymentMethod[] = [
     id: 'crypto',
     label: 'Crypto',
     blurb: 'BTC, ETH or USDT. Irreversible — check the network carefully.',
-    glyph: '₿',
+    logoFile: '',
+    brandColor: '#F7931A',
     handle: '',
     clearingTime: 'BTC ~10–60 min · ETH/USDT ~1–5 min after confirmations',
     instructions: [
@@ -169,9 +181,3 @@ export function hasAnyConfiguredMethod(): boolean {
   return paymentMethods.some(isMethodConfigured)
 }
 
-/** Footer badges. Crypto expands to the assets we actually accept. */
-export function paymentBadges(): string[] {
-  const base = paymentMethods.filter((m) => m.id !== 'crypto').map((m) => m.label)
-  const crypto = configuredCryptoAssets().map((asset) => asset.symbol)
-  return [...base, ...(crypto.length > 0 ? crypto : ['BTC', 'ETH', 'USDT'])]
-}

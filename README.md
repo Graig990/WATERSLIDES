@@ -72,6 +72,12 @@ Everything lives in [`src/data/payments.ts`](src/data/payments.ts) — handles i
 
 Before launch: fill each field in, then **send yourself a small test payment on every method you enable.** Copy crypto addresses from your wallet; never retype them.
 
+### Payment method logos
+
+The three crypto marks (Bitcoin, Ethereum, Tether) are drawn in `src/components/ui/PaymentLogos.tsx` — those are openly licensed and the reproductions are faithful.
+
+Zelle, Chime, Cash App and Apple Pay are registered trademarks and their artwork is not in this repo. Each shows a brand-coloured wordmark chip until you download the official SVG into `public/brand/payments/` and set `logoFile` in `payments.ts`. **[That folder README](public/brand/payments/README.md) lists where to get each one** — including a warning that the Apple Pay mark denotes payment via a processor, not the Apple Cash person-to-person transfer this site currently describes.
+
 ### Things to know about these rails
 
 - **No chargeback or buyer/seller protection** on any of them. Confirm funds have actually cleared before shipping — Zelle and Cash App payments can still be reversed by a sending bank in fraud cases, and crypto cannot be reversed at all.

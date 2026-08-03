@@ -3,13 +3,10 @@ import { Mail, Phone } from 'lucide-react'
 import { LogoStacked } from '@/components/ui/Logo'
 import { FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/ui/SocialIcons'
 import { siteConfig } from '@/data/site'
-import { paymentBadges } from '@/data/payments'
+import { paymentMethods } from '@/data/payments'
+import { PaymentMethodLogo } from '@/components/ui/PaymentMethodLogo'
 import { footerNav } from './navigation'
 import { NewsletterForm } from './NewsletterForm'
-
-// Rendered as text rather than brand logos — those marks are trademarked
-// and not ours to redistribute.
-const PAYMENT_METHODS = paymentBadges()
 
 const SOCIAL_LINKS = [
   { href: siteConfig.socials.facebook, label: 'Facebook', Icon: FacebookIcon },
@@ -107,13 +104,15 @@ export function Footer() {
             <p className="mb-2 text-xs font-extrabold tracking-[0.15em] text-white/60 uppercase">
               We accept
             </p>
-            <ul className="flex flex-wrap gap-2">
-              {PAYMENT_METHODS.map((method) => (
+            {/* White tiles so each brand's own colours read correctly. */}
+            <ul className="flex flex-wrap items-center gap-2">
+              {paymentMethods.map((method) => (
                 <li
-                  key={method}
-                  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-bold text-white"
+                  key={method.id}
+                  className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5"
+                  title={method.label}
                 >
-                  {method}
+                  <PaymentMethodLogo method={method} className="h-5" />
                 </li>
               ))}
             </ul>

@@ -13,6 +13,7 @@ import { useHydrated } from '@/hooks/useHydrated'
 import { formatPrice } from '@/lib/utils'
 import { checkoutSchema, fieldErrors, shippingAddressSchema } from '@/lib/validation'
 import { paymentMethods } from '@/data/payments'
+import { PaymentMethodLogo } from '@/components/ui/PaymentMethodLogo'
 import { US_STATES, isNonContiguous } from '@/lib/us-states'
 
 const SHIPPING_METHODS = [
@@ -361,7 +362,7 @@ export function CheckoutForm() {
                   />
                   <span className="flex-1">
                     <span className="flex items-center gap-2 font-bold">
-                      <span aria-hidden="true">{method.glyph}</span>
+                      <PaymentMethodLogo method={method} className="h-6" />
                       {method.label}
                     </span>
                     <span className="block text-sm text-ink/70">{method.blurb}</span>

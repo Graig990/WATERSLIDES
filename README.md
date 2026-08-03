@@ -1,6 +1,6 @@
 # WaterSlides4Kids
 
-Commercial-grade inflatable water slide e-commerce store. Next.js 16 (App Router) + TypeScript + Tailwind CSS v4, statically prerendered, Vercel-ready.
+Commercial-grade inflatable water slide e-commerce store. Next.js 16 (App Router) + TypeScript + Tailwind CSS v4, exported as a fully static site and hosted on GitHub Pages. Push to `main` and the live site updates.
 
 **Live routes:** 67 prerendered pages — 26 product pages, 8 collections, 10 long-form guides, plus shop, cart, checkout, support and legal pages.
 
@@ -21,16 +21,17 @@ Open http://localhost:3000. No env vars are required — the full cart → check
 | --- | --- |
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` | Production build |
-| `npm run start` | Serve the production build |
+| `npm run serve` | Serve the static export in `out/` on :3100 |
 | `npm run lint` | ESLint (flat config, `next/core-web-vitals` + `next/typescript`) |
 | `npm run typecheck` | `tsc --noEmit`, strict mode, zero `any` |
 | `npm run audit -- http://localhost:3000` | Crawl a running build and check for dead links, duplicate/missing titles and descriptions, H1 counts, canonicals, missing image alt, and invalid JSON-LD |
 
-The audit is the pre-deploy gate. Run it against a production build:
+The audit is the pre-deploy gate. Run it against the built output:
 
 ```bash
-npm run build && npm run start &
-npm run audit -- http://localhost:3000
+npm run build
+npm run serve &
+npm run audit -- http://127.0.0.1:3100
 ```
 
 It exits non-zero on any error, so it drops straight into CI.
@@ -61,7 +62,7 @@ The store accepts **Zelle, Chime, Cash App, Apple Pay and crypto (BTC, ETH, USDT
 
 Orders are therefore *awaiting payment*, never *paid*, and the UI says so.
 
-**Prices are resolved server-side from `products.ts` by slug.** The client only ever posts slugs and quantities — a price posted from the browser is never trusted.
+**Prices are resolved from `products.ts` by slug**, not read off the submitted form, so the UI cannot be fooled by editing a hidden field. Note this now runs in the browser — see the static-hosting caveats in [`docs/deploying-to-github-pages.md`](docs/deploying-to-github-pages.md).
 
 ### Configuring payment accounts
 
@@ -85,7 +86,6 @@ Before launch: fill each field in, then **send yourself a small test payment on 
 ```
 src/
   app/                   Routes (App Router)
-    api/                 checkout, contact, newsletter, notify, reviews
     collections/[slug]/  All 8 collections (topic + height)
     shop/[slug]/         26 product pages
     blog/[slug]/         10 guides, bodies pulled from src/content
@@ -93,10 +93,13 @@ src/
   components/
     blog/ cart/ checkout/ home/ layout/ product/ shop/ ui/
   content/blog/          MDX article bodies
-  data/                  site.ts, products.ts, collections.ts, blog.ts, reviews.ts, payments.ts
+  data/                  site.ts, products.ts, collections.ts, blog.ts, reviews.ts,
+                         payments.ts, forms.ts
   hooks/ lib/ store/
 public/brand/            Logo lockups, favicons, PWA icons, OG card
 scripts/audit.mjs        Link + SEO crawler
+scripts/generate-redirects.mjs  Static redirect stubs (runs after build)
+.github/workflows/       Auto-deploy to GitHub Pages on push to main
 docs/                    Competitive analysis, launch checklist, brand guide
 ```
 
@@ -214,9 +217,14 @@ Every handle and wallet address in `src/data/payments.ts` is blank. Until they a
 
 ## Deploying
 
-**This app cannot run on GitHub Pages.** Pages serves static files only — no Node server, so no API routes, no image optimisation, no redirects. Enabling it publishes `README.md` as the homepage instead of the site.
+**Push to `main` and the site deploys itself.** `.github/workflows/deploy.yml` typechecks, lints, builds the static export and publishes it to GitHub Pages. Typecheck and lint run first, so a broken commit fails the workflow and the live site keeps serving the previous version.
 
-Deploy to **Vercel**: step-by-step instructions, including the DNS move, are in [`docs/deploying-to-vercel.md`](docs/deploying-to-vercel.md). Import the repo, change nothing on the configure screen, deploy.
+One-time setup and the full trade-offs of static hosting are in [`docs/deploying-to-github-pages.md`](docs/deploying-to-github-pages.md). The short version of what static costs you:
+
+- **No API routes.** Form submissions need a third-party backend — see `src/data/forms.ts`. **Until it is configured, forms do not send anything**; they say so and offer a prefilled `mailto:` rather than faking success.
+- **Order totals are computed in the browser.** Acceptable only because payment is manual and you confirm the amount received before shipping. Do not add a card gateway without moving the calculation back to a server.
+- **Images are not optimised.** `next/image` optimisation needs a server. Self-hosting resized images recovers most of the loss.
+- **Redirects are meta-refresh, not 301**, generated by `scripts/generate-redirects.mjs`.
 
 Then work through [`docs/seo-launch-checklist.md`](docs/seo-launch-checklist.md).
 

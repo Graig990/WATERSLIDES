@@ -3,8 +3,10 @@
 import { useState, type FormEvent } from 'react'
 import { Check, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { submitForm } from '@/lib/submitForm'
+import { newsletterSchema } from '@/lib/validation'
 
-type Status = 'idle' | 'submitting' | 'success' | 'error'
+type Status = 'idle' | 'submitting' | 'success' | 'error' | 'unconfigured'
 
 export function NewsletterForm({
   variant = 'footer',
@@ -16,36 +18,60 @@ export function NewsletterForm({
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [message, setMessage] = useState('')
+  const [mailto, setMailto] = useState('')
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setStatus('submitting')
 
-    try {
-      const response = await fetch('/api/newsletter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
-      const data: { ok?: boolean; message?: string } = await response.json()
-
-      if (!response.ok || !data.ok) {
-        setStatus('error')
-        setMessage(data.message ?? 'Something went wrong. Please try again.')
-        return
-      }
-
-      setStatus('success')
-      setMessage(data.message ?? 'You are subscribed.')
-      setEmail('')
-    } catch {
+    const parsed = newsletterSchema.safeParse({ email })
+    if (!parsed.success) {
       setStatus('error')
-      setMessage('Network error. Please try again.')
+      setMessage(parsed.error.issues[0]?.message ?? 'Enter a valid email address.')
+      return
     }
+
+    setStatus('submitting')
+    const result = await submitForm('newsletter', parsed.data)
+
+    if (result.status === 'unconfigured') {
+      setStatus('unconfigured')
+      setMailto(result.mailto)
+      setMessage(result.message)
+      return
+    }
+    if (result.status === 'error') {
+      setStatus('error')
+      setMessage(result.message)
+      return
+    }
+
+    setStatus('success')
+    setMessage('You are on the list — your $50 code is on its way.')
+    setEmail('')
   }
 
   const inputId = `newsletter-${variant}`
   const onBand = variant === 'band'
+
+  // No form backend configured yet — say so rather than claiming success.
+  if (status === 'unconfigured') {
+    return (
+      <p
+        role="alert"
+        className={cn(
+          'rounded-2xl px-4 py-3 text-sm font-semibold',
+          onBand ? 'bg-white text-ink' : 'bg-white/15 text-white',
+          className,
+        )}
+      >
+        {message}{' '}
+        <a href={mailto} className="underline">
+          Email us to subscribe
+        </a>
+        .
+      </p>
+    )
+  }
 
   if (status === 'success') {
     return (

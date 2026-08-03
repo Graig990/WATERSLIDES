@@ -4,6 +4,10 @@ import { blogPosts } from '@/data/blog'
 import { products } from '@/data/products'
 import { absoluteUrl } from '@/data/site'
 
+// Required under `output: 'export'` — generated at build time rather than
+// served by a running route handler.
+export const dynamic = 'force-static'
+
 /**
  * Only URLs that return 200 and are indexable belong here.
  *

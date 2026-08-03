@@ -8,6 +8,7 @@ import { AlertTriangle, Lock } from 'lucide-react'
 import { ButtonLink } from '@/components/ui/Button'
 import { LogoIcon } from '@/components/ui/Logo'
 import { cartSubtotal, useCartStore } from '@/store/cart'
+import { placeOrder } from '@/lib/placeOrder'
 import { useHydrated } from '@/hooks/useHydrated'
 import { formatPrice } from '@/lib/utils'
 import { checkoutSchema, fieldErrors, shippingAddressSchema } from '@/lib/validation'
@@ -64,7 +65,7 @@ export function CheckoutForm() {
     })
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setFormError('')
 
@@ -100,62 +101,44 @@ export function CheckoutForm() {
     }
 
     setSubmitting(true)
-    try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
 
-      const data: {
-        ok?: boolean
-        message?: string
-        errors?: Record<string, string>
-        orderNumber?: string
-        redirectUrl?: string
-        subtotal?: number
-        payment?: {
-          method: string
-          label: string
-          configured: boolean
-          cryptoAsset: string | null
-        }
-      } = await response.json()
+    // The site is a static export, so there is no API route to call — the
+    // order is built in the browser. See src/lib/placeOrder.ts for why that
+    // is acceptable while payment is settled manually.
+    const result = placeOrder(payload)
 
-      if (!response.ok || !data.ok || !data.redirectUrl) {
-        setErrors(data.errors ?? {})
-        setFormError(data.message ?? 'We could not process that. Please try again.')
-        setSubmitting(false)
-        return
-      }
-
-      // Hand the confirmation page a snapshot before the cart is cleared.
-      // sessionStorage, not localStorage: it should not outlive the tab.
-      sessionStorage.setItem(
-        'ws4k-last-order',
-        JSON.stringify({
-          orderNumber: data.orderNumber,
-          email: address.data.email,
-          firstName: address.data.firstName,
-          shippingMethod: address.data.shippingMethod,
-          state: address.data.state,
-          subtotal: data.subtotal ?? cartSubtotal(lines),
-          payment: data.payment ?? null,
-          lines: lines.map((line) => ({
-            slug: line.slug,
-            name: line.name,
-            image: line.image,
-            price: line.price,
-            quantity: line.quantity,
-          })),
-        }),
-      )
-      clear()
-      router.push(data.redirectUrl)
-    } catch {
-      setFormError('Network error. Please check your connection and try again.')
+    if (!result.ok) {
+      setErrors(result.errors ?? {})
+      setFormError(result.message)
       setSubmitting(false)
+      return
     }
+
+    const { order } = result
+
+    // Hand the confirmation page a snapshot before the cart is cleared.
+    // sessionStorage, not localStorage: it should not outlive the tab.
+    sessionStorage.setItem(
+      'ws4k-last-order',
+      JSON.stringify({
+        orderNumber: order.orderNumber,
+        email: address.data.email,
+        firstName: address.data.firstName,
+        shippingMethod: address.data.shippingMethod,
+        state: address.data.state,
+        subtotal: order.subtotal,
+        payment: order.payment,
+        lines: lines.map((line) => ({
+          slug: line.slug,
+          name: line.name,
+          image: line.image,
+          price: line.price,
+          quantity: line.quantity,
+        })),
+      }),
+    )
+    clear()
+    router.push(order.redirectUrl)
   }
 
   if (!hydrated) {

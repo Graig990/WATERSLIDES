@@ -4,6 +4,8 @@ import { useState, type FormEvent } from 'react'
 import { CheckCircle2, Star } from 'lucide-react'
 import { fieldErrors, reviewSchema } from '@/lib/validation'
 import { cn } from '@/lib/utils'
+import { submitForm } from '@/lib/submitForm'
+import { siteConfig } from '@/data/site'
 
 const EMPTY = {
   authorName: '',
@@ -24,7 +26,8 @@ export function ReviewForm({
 }) {
   const [form, setForm] = useState(EMPTY)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error' | 'unconfigured'>('idle')
+  const [mailto, setMailto] = useState('')
   const [message, setMessage] = useState('')
   const [open, setOpen] = useState(false)
 
@@ -50,30 +53,34 @@ export function ReviewForm({
       return
     }
 
-    setStatus('submitting')
-    try {
-      const response = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.data),
-      })
-      const data: { ok?: boolean; message?: string; errors?: Record<string, string> } =
-        await response.json()
-
-      if (!response.ok || !data.ok) {
-        setErrors(data.errors ?? {})
-        setStatus('error')
-        setMessage(data.message ?? 'Something went wrong. Please try again.')
-        return
-      }
-
+    // Honeypot: a filled `website` field means a bot.
+    if (parsed.data.website) {
       setStatus('success')
-      setMessage(data.message ?? 'Thanks — your review has been sent for verification.')
+      setMessage('Thanks for your review.')
       setForm(EMPTY)
-    } catch {
-      setStatus('error')
-      setMessage('Network error. Please try again.')
+      return
     }
+
+    setStatus('submitting')
+    const result = await submitForm('review', parsed.data)
+
+    if (result.status === 'unconfigured') {
+      setStatus('unconfigured')
+      setMailto(result.mailto)
+      setMessage(result.message)
+      return
+    }
+    if (result.status === 'error') {
+      setStatus('error')
+      setMessage(result.message)
+      return
+    }
+
+    setStatus('success')
+    setMessage(
+      'Thank you — your review has been sent for verification. We check every review against a real order before publishing it, so it may take a day or two to appear.',
+    )
+    setForm(EMPTY)
   }
 
   if (status === 'success') {
@@ -85,6 +92,32 @@ export function ReviewForm({
         <CheckCircle2 aria-hidden="true" className="mx-auto mb-3 h-10 w-10 text-lime-ink" />
         <h3 className="text-xl">Review submitted</h3>
         <p className="mx-auto mt-2 max-w-md text-ink/75">{message}</p>
+      </div>
+    )
+  }
+
+  // No form backend configured, so the review cannot be delivered.
+  if (status === 'unconfigured') {
+    return (
+      <div
+        role="alert"
+        className="rounded-3xl border-2 border-sunny-yellow bg-sunny-yellow/15 p-6 text-center"
+      >
+        <h3 className="text-xl">Please email your review instead</h3>
+        <p className="mx-auto mt-2 max-w-md text-ink/80">{message}</p>
+        <a
+          href={mailto}
+          className="mt-4 inline-flex min-h-[44px] items-center rounded-2xl bg-ink px-6 font-extrabold text-white hover:bg-deep-blue"
+        >
+          Open email with your review
+        </a>
+        <p className="mt-3 text-sm text-ink/70">
+          Or call{' '}
+          <a href={`tel:${siteConfig.phoneE164}`} className="font-bold underline">
+            {siteConfig.phone}
+          </a>
+          .
+        </p>
       </div>
     )
   }

@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from 'react'
 import { CheckCircle2, Send } from 'lucide-react'
 import { contactSchema, fieldErrors } from '@/lib/validation'
+import { submitForm } from '@/lib/submitForm'
+import { siteConfig } from '@/data/site'
 
 const SUBJECTS = [
   'Choosing the right slide',
@@ -18,7 +20,8 @@ const EMPTY = { name: '', email: '', phone: '', subject: '', message: '', websit
 export function ContactForm() {
   const [form, setForm] = useState(EMPTY)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error' | 'unconfigured'>('idle')
+  const [mailto, setMailto] = useState('')
   const [message, setMessage] = useState('')
 
   function update(key: keyof typeof EMPTY, value: string) {
@@ -43,30 +46,33 @@ export function ContactForm() {
       return
     }
 
-    setStatus('submitting')
-    try {
-      const response = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.data),
-      })
-      const data: { ok?: boolean; message?: string; errors?: Record<string, string> } =
-        await response.json()
-
-      if (!response.ok || !data.ok) {
-        setErrors(data.errors ?? {})
-        setStatus('error')
-        setMessage(data.message ?? 'Something went wrong. Please try again.')
-        return
-      }
-
+    // Honeypot: a filled `website` field means a bot. Report success so it
+    // gets no signal, but send nothing.
+    if (parsed.data.website) {
       setStatus('success')
-      setMessage(data.message ?? 'Thanks — we will be in touch.')
+      setMessage('Thanks — your message is with us.')
       setForm(EMPTY)
-    } catch {
-      setStatus('error')
-      setMessage('Network error. Please try again, or give us a call.')
+      return
     }
+
+    setStatus('submitting')
+    const result = await submitForm('contact', parsed.data)
+
+    if (result.status === 'unconfigured') {
+      setStatus('unconfigured')
+      setMailto(result.mailto)
+      setMessage(result.message)
+      return
+    }
+    if (result.status === 'error') {
+      setStatus('error')
+      setMessage(result.message)
+      return
+    }
+
+    setStatus('success')
+    setMessage('Thanks — your message is with us and we reply within one business day.')
+    setForm(EMPTY)
   }
 
   if (status === 'success') {
@@ -78,6 +84,36 @@ export function ContactForm() {
         <CheckCircle2 aria-hidden="true" className="mx-auto mb-3 h-12 w-12 text-lime-ink" />
         <h2 className="text-2xl">Message sent</h2>
         <p className="mt-2 text-ink/75">{message}</p>
+      </div>
+    )
+  }
+
+  /*
+   * No form backend is configured, so nothing can be delivered. Say so and
+   * hand over a prefilled email instead — a contact form that reports
+   * success and quietly discards the enquiry is the worst possible outcome.
+   */
+  if (status === 'unconfigured') {
+    return (
+      <div
+        role="alert"
+        className="rounded-3xl border-2 border-sunny-yellow bg-sunny-yellow/15 p-8 text-center"
+      >
+        <h2 className="text-2xl">Please email us instead</h2>
+        <p className="mx-auto mt-2 max-w-md text-ink/80">{message}</p>
+        <a
+          href={mailto}
+          className="mt-5 inline-flex min-h-[48px] items-center rounded-2xl bg-ink px-6 font-extrabold text-white hover:bg-deep-blue"
+        >
+          Open email with your message
+        </a>
+        <p className="mt-4 text-sm text-ink/70">
+          Or call{' '}
+          <a href={`tel:${siteConfig.phoneE164}`} className="font-bold underline">
+            {siteConfig.phone}
+          </a>{' '}
+          — {siteConfig.hours}.
+        </p>
       </div>
     )
   }

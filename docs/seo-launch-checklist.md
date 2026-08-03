@@ -13,7 +13,7 @@ Work through this in order. Phase 0 is not optional — shipping without it crea
 - [ ] **Have an attorney review `/privacy-policy` and `/terms`.** Both carry a visible template banner. Set the governing-law state.
 - [ ] **Set `NEXT_PUBLIC_SITE_URL`** to the production origin, or canonicals and the sitemap will point at the wrong domain.
 - [ ] **Fill in your payment accounts** in `src/data/payments.ts` — every handle and wallet address ships empty. Then send yourself a small test payment on each method you enable. Copy crypto addresses from your wallet; never retype them.
-- [ ] **Wire up the form endpoints.** `/api/contact`, `/api/newsletter`, `/api/notify` and `/api/reviews` validate and accept but deliver nowhere. A contact form that silently discards messages is worse than no contact form.
+- [ ] **Configure a form backend** in `src/data/forms.ts` (Formspree, Web3Forms, Formsubmit, Basin — all free tiers). Until then the contact, newsletter, back-in-stock and review forms deliver nothing; they fail honestly with a mailto fallback, but that is a poor substitute for a working form.
 - [ ] **Decide where orders go.** Orders are not persisted — the confirmation page reads a `sessionStorage` snapshot, so a customer who closes the tab loses their payment instructions. Wire up order storage and a confirmation email before taking real money.
 - [ ] **Set `socialsClaimed: true`** only once you control those handles. Until then they stay out of `sameAs`.
 
@@ -21,7 +21,8 @@ Work through this in order. Phase 0 is not optional — shipping without it crea
 
 ## Phase 1 — Technical verification (launch day)
 
-- [ ] **Deployed to a host that can run Next.js.** GitHub Pages cannot — see [deploying-to-vercel.md](deploying-to-vercel.md). If the homepage shows your README, Pages is serving the repo instead of the app.
+- [ ] **Pages Source is set to GitHub Actions**, not "Deploy from a branch" — see [deploying-to-github-pages.md](deploying-to-github-pages.md). If the homepage shows your README, it is still on branch mode.
+- [ ] **The homepage renders with styling.** Unstyled means `public/.nojekyll` is missing and Jekyll has stripped the `_next/` folder.
 
 - [ ] `npm run build` — clean
 - [ ] `npm run typecheck` — clean
@@ -32,6 +33,7 @@ Work through this in order. Phase 0 is not optional — shipping without it crea
 - [ ] `https://yourdomain.com/sitemap.xml` loads and contains only 200-status indexable URLs (no `/cart`, `/checkout`, `/order-confirmation`)
 - [ ] Custom 404 renders and links back into the catalog
 - [ ] Test the full cart → checkout → confirmation flow **on production**
+- [ ] Confirm a legacy path such as `/products/<slug>/` redirects (meta-refresh, not 301 — static hosting cannot issue one)
 - [ ] Spot-check `/shop`, one PDP and one guide with JavaScript disabled — content should still be there
 - [ ] Run 3 PDPs, 2 collections, the homepage and 2 posts through the [Rich Results Test](https://search.google.com/test/rich-results). Expect zero errors. `AggregateRating` should be **absent** until you have real reviews.
 - [ ] Validate the sitemap with an XML sitemap validator

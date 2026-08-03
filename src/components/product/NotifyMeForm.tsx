@@ -4,8 +4,10 @@ import { useState, type FormEvent } from 'react'
 import { BellRing, Check } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
+import { submitForm } from '@/lib/submitForm'
+import { notifySchema } from '@/lib/validation'
 
-type Status = 'idle' | 'submitting' | 'success' | 'error'
+type Status = 'idle' | 'submitting' | 'success' | 'error' | 'unconfigured'
 
 /** Replaces Add to Cart on out-of-stock products. */
 export function NotifyMeForm({
@@ -22,32 +24,55 @@ export function NotifyMeForm({
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [message, setMessage] = useState('')
+  const [mailto, setMailto] = useState('')
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setStatus('submitting')
 
-    try {
-      const response = await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, productSlug, productName }),
-      })
-      const data: { ok?: boolean; message?: string } = await response.json()
-
-      if (!response.ok || !data.ok) {
-        setStatus('error')
-        setMessage(data.message ?? 'Something went wrong. Please try again.')
-        return
-      }
-
-      setStatus('success')
-      setMessage(data.message ?? 'You are on the list.')
-      setEmail('')
-    } catch {
+    const parsed = notifySchema.safeParse({ email, productSlug, productName })
+    if (!parsed.success) {
       setStatus('error')
-      setMessage('Network error. Please try again.')
+      setMessage(parsed.error.issues[0]?.message ?? 'Enter a valid email address.')
+      return
     }
+
+    setStatus('submitting')
+    const result = await submitForm('notify', parsed.data)
+
+    if (result.status === 'unconfigured') {
+      setStatus('unconfigured')
+      setMailto(result.mailto)
+      setMessage(result.message)
+      return
+    }
+    if (result.status === 'error') {
+      setStatus('error')
+      setMessage(result.message)
+      return
+    }
+
+    setStatus('success')
+    setMessage(`Done — we will email you when the ${productName} is back.`)
+    setEmail('')
+  }
+
+  // No form backend configured yet — say so rather than claiming success.
+  if (status === 'unconfigured') {
+    return (
+      <p
+        role="alert"
+        className={cn(
+          'rounded-2xl bg-sunny-yellow/25 px-3 py-2.5 text-sm font-semibold',
+          className,
+        )}
+      >
+        {message}{' '}
+        <a href={mailto} className="underline">
+          Email us about the {productName}
+        </a>
+        .
+      </p>
+    )
   }
 
   if (status === 'success') {

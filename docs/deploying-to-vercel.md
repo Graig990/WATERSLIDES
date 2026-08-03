@@ -18,11 +18,16 @@ Vercel is built by the Next.js team and runs all of it with no code changes.
 
 Do this first, so the domain stops serving the README.
 
-1. Go to **github.com/Graig990/WATERSLIDES → Settings → Pages**
-2. Under **Build and deployment → Source**, select **None**  *(or, if there is a "Custom domain" box, clear it first)*
-3. Save
+The `CNAME` file has already been deleted from this repo — that alone stopped Pages serving the custom domain, and it matters beyond tidiness: while `CNAME` exists, GitHub Pages keeps claiming `waterslides4kids.com`, which can block Vercel from verifying the domain and issuing its SSL certificate.
 
-The `CNAME` file in the repo root is a GitHub Pages artefact. It is inert on Vercel, so it can stay — but delete it if you want the repo tidy.
+To disable Pages fully:
+
+1. Go to **github.com/Graig990/WATERSLIDES → Settings → Pages**
+2. Under **Build and deployment**, leave **Source** as *Deploy from a branch* — the Source dropdown only offers "Deploy from a branch" and "GitHub Actions", there is no "None" there.
+3. Open the **Branch** dropdown below it (currently `main`) and select **None**
+4. **Save**
+
+Some accounts also show an **Unpublish site** button beneath the "Your site is live at…" banner, which does the same thing. Clearing the **Custom domain** field is a softer alternative — Pages then serves at `graig990.github.io/WATERSLIDES` and releases your domain.
 
 ## Step 2 — Import the repo into Vercel
 

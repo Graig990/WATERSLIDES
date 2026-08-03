@@ -7,8 +7,7 @@ import { ChevronDown, Home, Menu, Search, ShoppingCart, X } from 'lucide-react'
 import { HeaderLogo, LogoStacked } from '@/components/ui/Logo'
 import { useCartStore, cartItemCount } from '@/store/cart'
 import { useHydrated } from '@/hooks/useHydrated'
-import { useScrollLock } from '@/hooks/useScrollLock'
-import { Portal } from '@/components/ui/Portal'
+import { ModalSheet } from '@/components/ui/ModalSheet'
 import { cn } from '@/lib/utils'
 import { isNavItemActive, megaMenuHeights, megaMenuTopics, primaryNav } from './navigation'
 
@@ -39,9 +38,6 @@ export function Header() {
     setSearchOpen(false)
   }
 
-  // The mobile panel covers the viewport — stop the page behind it scrolling.
-  useScrollLock(mobileOpen)
-
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus()
   }, [searchOpen])
@@ -50,8 +46,8 @@ export function Header() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return
+      // The mobile panel is a <dialog> and closes itself on Escape.
       setMegaOpen(false)
-      setMobileOpen(false)
       setSearchOpen(false)
     }
     function onPointerDown(event: MouseEvent) {
@@ -259,23 +255,24 @@ export function Header() {
       ) : null}
 
       {/*
-        Mobile panel — portalled to <body>.
+        Mobile panel — a native <dialog> opened with showModal(), which puts
+        it in the browser's top layer.
 
-        It must not render inside <header>: the header's backdrop-blur makes
-        it a containing block for fixed-position descendants, so `fixed
-        inset-0` would resolve against the 72px header box instead of the
-        viewport and the menu would collapse into an invisible strip while
-        the scroll lock still froze the page.
+        It deliberately does not rely on z-index. The header's backdrop-blur
+        makes it a containing block for fixed-position descendants, which
+        once collapsed this panel into an invisible 72px sliver, and any
+        future ancestor with a transform or filter could do the same. The top
+        layer paints above everything regardless of stacking context, so that
+        entire class of bug cannot recur.
       */}
-      {mobileOpen ? (
-        <Portal>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Site menu"
-            className="fixed inset-0 z-[70] flex flex-col overscroll-contain bg-white lg:hidden"
-          >
-            <div className="flex h-[72px] shrink-0 items-center justify-between border-b-2 border-sky-tint px-4">
+      <ModalSheet
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        label="Site menu"
+        className="h-full w-full"
+      >
+        <div className="flex h-dvh w-screen flex-col overscroll-contain bg-white">
+          <div className="flex h-[72px] shrink-0 items-center justify-between border-b-2 border-sky-tint px-4">
             <span className="font-extrabold text-deep-blue">Menu</span>
             <button
               type="button"
@@ -336,10 +333,9 @@ export function Header() {
                 </li>
               ))}
             </ul>
-            </nav>
-          </div>
-        </Portal>
-      ) : null}
+          </nav>
+        </div>
+      </ModalSheet>
     </header>
   )
 }

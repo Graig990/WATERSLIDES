@@ -24,7 +24,7 @@ Open http://localhost:3000. No env vars are required — the full cart → check
 | `npm run serve` | Serve the static export in `out/` on :3100 |
 | `npm run lint` | ESLint (flat config, `next/core-web-vitals` + `next/typescript`) |
 | `npm run typecheck` | `tsc --noEmit`, strict mode, zero `any` |
-| `npm run audit -- http://localhost:3000` | Crawl a running build and check for dead links, duplicate/missing titles and descriptions, H1 counts, canonicals, missing image alt, and invalid JSON-LD |
+| `npm run audit -- http://127.0.0.1:3100` | Crawl a running build and check for dead links, duplicate/missing titles and descriptions, H1 counts, canonicals, missing image alt, and invalid JSON-LD |
 
 The audit is the pre-deploy gate. Run it against the built output:
 
@@ -56,7 +56,7 @@ There are no payment env vars — see below.
 The store accepts **Zelle, Chime, Cash App, Apple Pay and crypto (BTC, ETH, USDT)**. There is no card gateway, which shapes the whole flow:
 
 1. Customer picks a payment method at checkout.
-2. `/api/checkout` validates, resolves prices, and issues an order number. **Nothing is charged.**
+2. The order is validated, prices are resolved from the catalog, and an order number is issued — in the browser, since static hosting has no server. **Nothing is charged.**
 3. The confirmation page shows payment instructions for that method — account handle or wallet address, the exact amount, and the order number to use as a reference.
 4. You confirm the funds have cleared, then ship.
 

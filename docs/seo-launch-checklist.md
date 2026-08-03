@@ -12,13 +12,16 @@ Work through this in order. Phase 0 is not optional — shipping without it crea
 - [ ] **Confirm every specification with your supplier.** All specs are labelled example values. Weight limits and age ranges on a children's product are a liability matter.
 - [ ] **Have an attorney review `/privacy-policy` and `/terms`.** Both carry a visible template banner. Set the governing-law state.
 - [ ] **Set `NEXT_PUBLIC_SITE_URL`** to the production origin, or canonicals and the sitemap will point at the wrong domain.
-- [ ] **Decide on Stripe.** Add keys for real payments, or launch in demo mode knowingly — demo mode takes no money.
-- [ ] **Wire up the form endpoints.** `/api/contact`, `/api/newsletter` and `/api/notify` validate and accept but deliver nowhere. A contact form that silently discards messages is worse than no contact form.
+- [ ] **Fill in your payment accounts** in `src/data/payments.ts` — every handle and wallet address ships empty. Then send yourself a small test payment on each method you enable. Copy crypto addresses from your wallet; never retype them.
+- [ ] **Wire up the form endpoints.** `/api/contact`, `/api/newsletter`, `/api/notify` and `/api/reviews` validate and accept but deliver nowhere. A contact form that silently discards messages is worse than no contact form.
+- [ ] **Decide where orders go.** Orders are not persisted — the confirmation page reads a `sessionStorage` snapshot, so a customer who closes the tab loses their payment instructions. Wire up order storage and a confirmation email before taking real money.
 - [ ] **Set `socialsClaimed: true`** only once you control those handles. Until then they stay out of `sameAs`.
 
 ---
 
 ## Phase 1 — Technical verification (launch day)
+
+- [ ] **Deployed to a host that can run Next.js.** GitHub Pages cannot — see [deploying-to-vercel.md](deploying-to-vercel.md). If the homepage shows your README, Pages is serving the repo instead of the app.
 
 - [ ] `npm run build` — clean
 - [ ] `npm run typecheck` — clean

@@ -214,7 +214,9 @@ Every handle and wallet address in `src/data/payments.ts` is blank. Until they a
 
 ## Deploying
 
-Vercel-ready as-is (`vercel.json` included). Import the repo, set env vars, deploy. Set `NEXT_PUBLIC_SITE_URL` to the production origin or canonicals and the sitemap will point at the default domain.
+**This app cannot run on GitHub Pages.** Pages serves static files only — no Node server, so no API routes, no image optimisation, no redirects. Enabling it publishes `README.md` as the homepage instead of the site.
+
+Deploy to **Vercel**: step-by-step instructions, including the DNS move, are in [`docs/deploying-to-vercel.md`](docs/deploying-to-vercel.md). Import the repo, change nothing on the configure screen, deploy.
 
 Then work through [`docs/seo-launch-checklist.md`](docs/seo-launch-checklist.md).
 
